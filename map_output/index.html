@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runner626 地图查看器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #fff;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            font-size: 3em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .subtitle {
+            text-align: center;
+            font-size: 1.2em;
+            margin-bottom: 30px;
+            opacity: 0.9;
+        }
+        
+        .tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .tab {
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.2);
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1.1em;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        .tab:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+        }
+        
+        .tab.active {
+            background: rgba(255,255,255,0.9);
+            color: #667eea;
+            border-color: #fff;
+        }
+        
+        .content {
+            display: none;
+        }
+        
+        .content.active {
+            display: block;
+        }
+        
+        .stage-section {
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .stage-title {
+            font-size: 1.8em;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid rgba(255,255,255,0.3);
+        }
+        
+        .chunks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+        
+        .chunk-item {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .chunk-item h3 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+        
+        .chunk-item img {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            border: 2px solid rgba(255,255,255,0.2);
+            cursor: pointer;
+            transition: transform 0.3s;
+        }
+        
+        .chunk-item img:hover {
+            transform: scale(1.05);
+            border-color: rgba(255,255,255,0.5);
+        }
+        
+        .level-section {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 20px;
+        }
+        
+        .level-title {
+            font-size: 1.5em;
+            margin-bottom: 10px;
+        }
+        
+        .level-map {
+            width: 100%;
+            height: auto;
+            border-radius: 4px;
+            border: 2px solid rgba(255,255,255,0.3);
+            cursor: pointer;
+        }
+        
+        .level-map:hover {
+            border-color: rgba(255,255,255,0.6);
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            max-width: 95%;
+            max-height: 95%;
+            overflow: auto;
+            position: relative;
+        }
+        
+        .modal-content img {
+            width: 100%;
+            height: auto;
+            border-radius: 8px;
+        }
+        
+        .modal-close {
+            position: fixed;
+            top: 20px;
+            right: 30px;
+            font-size: 40px;
+            color: #fff;
+            cursor: pointer;
+            z-index: 1001;
+            background: rgba(0,0,0,0.5);
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .legend {
+            background: rgba(0,0,0,0.2);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .legend img {
+            width: 100%;
+            max-width: 400px;
+            height: auto;
+            border-radius: 4px;
+            border: 2px solid rgba(255,255,255,0.2);
+        }
+        
+        .info-box {
+            background: rgba(255,255,255,0.1);
+            border-left: 4px solid rgba(255,255,255,0.5);
+            padding: 15px;
+            margin: 20px 0;
+            border-radius: 4px;
+        }
+        
+        .info-box h3 {
+            margin-bottom: 10px;
+            font-size: 1.3em;
+        }
+        
+        .info-box ul {
+            list-style-position: inside;
+            line-height: 1.8;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎮 Runner626 地图查看器</h1>
+        <p class="subtitle">反编译项目地图可视化 - 基于Java代码复原</p>
+        
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('overview')">📊 概览</div>
+            <div class="tab" onclick="showTab('stage0')">Stage 0</div>
+            <div class="tab" onclick="showTab('stage1')">Stage 1</div>
+            <div class="tab" onclick="showTab('stage2')">Stage 2</div>
+            <div class="tab" onclick="showTab('stage3')">Stage 3</div>
+            <div class="tab" onclick="showTab('stage4')">Stage 4</div>
+        </div>
+        
+        <!-- 概览 -->
+        <div id="overview" class="content active">
+            <div class="stage-section">
+                <h2 class="stage-title">🎯 地图生成系统说明</h2>
+                
+                <div class="info-box">
+                    <h3>📦 地形块（Chunk）系统</h3>
+                    <ul>
+                        <li>每个Stage包含6个预制地形块</li>
+                        <li>每个块的尺寸为 100×30 tiles</li>
+                        <li>每个tile为 8×8 像素</li>
+                        <li>地形块包含地形、敌人、障碍物和收集品数据</li>
+                    </ul>
+                </div>
+                
+                <div class="info-box">
+                    <h3>🗺️ 关卡（Level）组装</h3>
+                    <ul>
+                        <li>关卡通过不同的块序列拼接而成</li>
+                        <li>同一个块可以在不同位置重复使用</li>
+                        <li>5个Stage文件生成15个不同的关卡</li>
+                        <li>每个关卡长度为 4800-6400 像素</li>
+                    </ul>
+                </div>
+                
+                <div class="info-box">
+                    <h3>🎨 颜色图例</h3>
+                    <ul>
+                        <li><span style="color: #8B4513">■</span> 棕色 = 普通地面</li>
+                        <li><span style="color: #00FF00">■</span> 绿色 = 地面顶部（可站立）</li>
+                        <li><span style="color: #696969">■</span> 灰色 = 金属平台</li>
+                        <li><span style="color: #FFA500">■</span> 橙色 = 特殊平台</li>
+                        <li><span style="color: #FF0000">■</span> 红色 = 尖刺/陷阱</li>
+                        <li><span style="color: #FFD700">■</span> 金色 = 可收集物品</li>
+                        <li><span style="color: #FF0000">●</span> 红色圆圈 = 敌人（标记E）</li>
+                        <li><span style="color: #800080">■</span> 紫色 = 障碍物</li>
+                        <li><span style="color: #FFD700">●</span> 金色圆圈 = 收集品</li>
+                    </ul>
+                </div>
+                
+                <div class="info-box">
+                    <h3>💡 使用说明</h3>
+                    <ul>
+                        <li>点击上方标签切换不同的Stage</li>
+                        <li>每个Stage显示6个地形块和对应的关卡地图</li>
+                        <li>点击任意图片可放大查看</li>
+                        <li>查看Tile Legend了解详细的地形类型</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stage 0-4 内容将由JavaScript动态生成 -->
+        <div id="stage0" class="content"></div>
+        <div id="stage1" class="content"></div>
+        <div id="stage2" class="content"></div>
+        <div id="stage3" class="content"></div>
+        <div id="stage4" class="content"></div>
+    </div>
+    
+    <!-- 图片放大模态框 -->
+    <div id="modal" class="modal">
+        <span class="modal-close" onclick="closeModal()">&times;</span>
+        <div class="modal-content">
+            <img id="modal-img" src="" alt="放大图片">
+        </div>
+    </div>
+    
+    <script>
+        // 标签切换
+        function showTab(tabId) {
+            // 隐藏所有内容
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            
+            // 显示选中的内容
+            document.getElementById(tabId).classList.add('active');
+            event.target.classList.add('active');
+            
+            // 如果是首次加载stage内容，生成HTML
+            if (tabId.startsWith('stage') && document.getElementById(tabId).innerHTML === '') {
+                loadStageContent(tabId);
+            }
+        }
+        
+        // 加载Stage内容
+        function loadStageContent(stageId) {
+            const stageNum = stageId.replace('stage', '');
+            const container = document.getElementById(stageId);
+            
+            let html = `
+                <div class="stage-section">
+                    <h2 class="stage-title">📦 Stage ${stageNum} - 地形块</h2>
+                    <div class="chunks-grid">
+            `;
+            
+            // 生成6个块
+            for (let i = 0; i < 6; i++) {
+                html += `
+                    <div class="chunk-item">
+                        <h3>Chunk ${i}</h3>
+                        <img src="stage${stageNum}_chunks/chunk_${i}.png" alt="Chunk ${i}" onclick="openModal(this.src)">
+                    </div>
+                `;
+            }
+            
+            html += `
+                    </div>
+                    <div class="legend">
+                        <h3>Tile类型图例</h3>
+                        <img src="stage${stageNum}_chunks/tile_legend.png" alt="Tile Legend" onclick="openModal(this.src)">
+                    </div>
+                </div>
+            `;
+            
+            // 生成关卡地图
+            const levelMappings = {
+                '0': [0, 1, 2],
+                '1': [3, 4, 5],
+                '2': [6, 7, 8],
+                '3': [9, 10, 11],
+                '4': [12, 13, 14]
+            };
+            
+            const levels = levelMappings[stageNum];
+            html += `
+                <div class="stage-section">
+                    <h2 class="stage-title">🗺️ Stage ${stageNum} - 完整关卡</h2>
+            `;
+            
+            for (const level of levels) {
+                html += `
+                    <div class="level-section">
+                        <h3 class="level-title">Level ${level}</h3>
+                        <img class="level-map" src="stage${stageNum}_levels/level_${level}_map.png" alt="Level ${level}" onclick="openModal(this.src)">
+                    </div>
+                `;
+            }
+            
+            html += `</div>`;
+            
+            container.innerHTML = html;
+        }
+        
+        // 打开图片放大模态框
+        function openModal(imgSrc) {
+            document.getElementById('modal').classList.add('active');
+            document.getElementById('modal-img').src = imgSrc;
+        }
+        
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('modal').classList.remove('active');
+        }
+        
+        // 点击模态框背景关闭
+        document.getElementById('modal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeModal();
+            }
+        });
+        
+        // ESC键关闭模态框
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

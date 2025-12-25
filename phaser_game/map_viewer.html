@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Runner626 - Phaser地图渲染器</title>
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.70.0/dist/phaser.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        
+        h1 {
+            color: white;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .controls {
+            background: rgba(255,255,255,0.95);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+        }
+        
+        .control-group label {
+            font-size: 12px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        
+        select, button {
+            padding: 10px 15px;
+            border: 2px solid #667eea;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        select {
+            background: white;
+        }
+        
+        button {
+            background: #667eea;
+            color: white;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background: #5568d3;
+            transform: translateY(-2px);
+        }
+        
+        .info {
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            color: #333;
+        }
+        
+        #game-container {
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+        }
+        
+        .legend {
+            background: rgba(255,255,255,0.95);
+            padding: 15px;
+            border-radius: 8px;
+            margin-top: 20px;
+            max-width: 800px;
+        }
+        
+        .legend h3 {
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+        
+        .legend-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border: 1px solid #999;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🎮 Runner626 - Phaser地图渲染器</h1>
+    
+    <div class="controls">
+        <div class="control-group">
+            <label>关卡选择</label>
+            <select id="level-select">
+                <option value="0">Level 0</option>
+                <option value="1">Level 1</option>
+                <option value="2">Level 2</option>
+                <option value="3">Level 3</option>
+                <option value="4">Level 4</option>
+                <option value="5">Level 5</option>
+                <option value="6">Level 6</option>
+                <option value="7">Level 7</option>
+                <option value="8">Level 8</option>
+                <option value="9">Level 9</option>
+                <option value="10">Level 10</option>
+                <option value="11">Level 11</option>
+                <option value="12">Level 12</option>
+                <option value="13">Level 13</option>
+                <option value="14">Level 14</option>
+                <option value="15">Level 15</option>
+            </select>
+        </div>
+        
+        <button id="reload-btn">🔄 重新加载</button>
+        <button id="zoom-in">🔍+ 放大</button>
+        <button id="zoom-out">🔍- 缩小</button>
+        <button id="editor-btn" onclick="window.location.href='map_editor.html'">✏️ 打开编辑器</button>
+    </div>
+    
+    <div class="info" id="info">
+        加载中...
+    </div>
+    
+    <div id="game-container"></div>
+    
+    <div class="legend">
+        <h3>🎨 地形颜色图例</h3>
+        <div class="legend-grid">
+            <div class="legend-item">
+                <div class="legend-color" style="background: #8B4513"></div>
+                <span>普通地面</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #00FF00"></div>
+                <span>地面顶部</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #696969"></div>
+                <span>金属平台</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FFA500"></div>
+                <span>特殊平台</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FF0000"></div>
+                <span>尖刺/陷阱</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FFD700"></div>
+                <span>收集品</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #40E0D0"></div>
+                <span>液体</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #800080"></div>
+                <span>障碍物</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #FF0000; border-radius: 50%"></div>
+                <span>敌人</span>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Tile颜色映射 - 与Python版本一致
+        const TILE_COLORS = {
+            0: 0x00000000,      // 空气 - 透明
+            1: 0x8B4513,        // 普通地面 - 棕色
+            2: 0xA0522D,        // 地面变种
+            7: 0x696969,        // 金属平台 - 灰色
+            8: 0x696969,
+            9: 0x696969,
+            10: 0x696969,
+            11: 0x696969,
+            12: 0xA9A9A9,       // 可切换平台
+            13: 0x646478,       // 特殊平台
+            18: 0x8C8CA0,
+            21: 0xFF0000,       // 尖刺 - 红色
+            22: 0xFF3232,
+            23: 0xFFA500,       // 可站立平台 - 橙色
+            28: 0x00FF00,       // 地面顶部 - 绿色
+            29: 0x00C800,
+            30: 0x00B400,
+            31: 0x00A000,
+            32: 0x008C00,
+            35: 0xC80000,       // 陷阱
+            39: 0xDC0000,
+            41: 0xFFC800,       // 特殊平台
+            48: 0xB40000,       // 尖刺陷阱
+            50: 0xC83200,
+            54: 0x808080,       // 墙壁
+            62: 0x40E0D0,       // 水/液体
+            63: 0x40C8C8,
+            64: 0x40B4B4,
+            68: 0xFFD700,       // 可收集物品
+            69: 0xFFDF00,
+            70: 0xFFE700,
+            82: 0x646464,       // 障碍物
+            89: 0x964B00,       // 可破坏物体
+            95: 0xDCDCDC,       // 装饰物
+            102: 0xAA5500,      // 可破坏箱子
+            131: 0xBE0000,      // 特殊陷阱
+            132: 0xB45A00,
+        };
+
+        class MapScene extends Phaser.Scene {
+            constructor() {
+                super({ key: 'MapScene' });
+                this.stageData = null;
+                this.levelConfig = null;
+                this.currentLevel = 0;
+                this.tileSize = 8;
+                this.zoomLevel = 1;
+            }
+
+            preload() {
+                // 预加载数据
+                this.load.json('levelConfig', '../map_data/level_config.json');
+                
+                for (let i = 0; i < 5; i++) {
+                    this.load.json(`stage${i}`, `../map_data/stage${i}.json`);
+                }
+            }
+
+            create() {
+                this.levelConfig = this.cache.json.get('levelConfig');
+                this.cameras.main.setBackgroundColor('#87CEEB'); // 天空蓝
+                
+                // 初始加载
+                this.loadLevel(0);
+                
+                // 设置相机控制
+                this.cameras.main.setZoom(this.zoomLevel);
+                
+                // 添加拖拽控制
+                this.input.on('pointermove', (pointer) => {
+                    if (pointer.isDown) {
+                        this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.zoomLevel;
+                        this.cameras.main.scrollY -= (pointer.y - pointer.prevPosition.y) / this.zoomLevel;
+                    }
+                });
+                
+                // 滚轮缩放
+                this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
+                    if (deltaY > 0) {
+                        this.zoomLevel = Math.max(0.25, this.zoomLevel - 0.1);
+                    } else {
+                        this.zoomLevel = Math.min(3, this.zoomLevel + 0.1);
+                    }
+                    this.cameras.main.setZoom(this.zoomLevel);
+                });
+            }
+
+            loadLevel(levelIndex) {
+                this.currentLevel = levelIndex;
+                
+                // 清除旧内容
+                this.children.removeAll();
+                
+                // 获取块序列
+                const sequence = this.levelConfig.chunkSequences[levelIndex];
+                
+                // 确定使用哪个stage
+                let stageIndex = Math.floor(levelIndex / 3);
+                if (stageIndex > 4) stageIndex = 4;
+                
+                const stageName = `stage${stageIndex}`;
+                this.stageData = this.cache.json.get(stageName);
+                
+                if (!this.stageData) {
+                    console.error('Stage data not found:', stageName);
+                    return;
+                }
+                
+                const chunkWidth = this.stageData.metadata.chunkWidth;
+                const chunkHeight = this.stageData.metadata.chunkHeight;
+                
+                let xOffset = 0;
+                
+                // 渲染每个块
+                sequence.forEach(chunkId => {
+                    const chunk = this.stageData.chunks[chunkId];
+                    if (chunk) {
+                        this.renderChunk(chunk, xOffset, 0);
+                        xOffset += chunkWidth * this.tileSize;
+                    }
+                });
+                
+                // 更新信息
+                this.updateInfo(sequence, xOffset);
+                
+                // 重置相机位置
+                this.cameras.main.scrollX = 0;
+                this.cameras.main.scrollY = 0;
+            }
+
+            renderChunk(chunk, offsetX, offsetY) {
+                const terrain = chunk.terrain;
+                const chunkHeight = terrain.length;
+                const chunkWidth = terrain[0].length;
+                
+                // 渲染地形
+                for (let y = 0; y < chunkHeight; y++) {
+                    for (let x = 0; x < chunkWidth; x++) {
+                        const tileValue = terrain[y][x];
+                        if (tileValue === 0) continue; // 跳过空气
+                        
+                        const color = TILE_COLORS[tileValue] || 0x505050;
+                        const px = offsetX + x * this.tileSize;
+                        const py = offsetY + y * this.tileSize;
+                        
+                        const tile = this.add.rectangle(
+                            px, py,
+                            this.tileSize, this.tileSize,
+                            color
+                        );
+                        tile.setOrigin(0, 0);
+                        tile.setStrokeStyle(0.5, 0x000000, 0.3);
+                    }
+                }
+                
+                // 渲染敌人
+                chunk.enemies.forEach(enemy => {
+                    const px = offsetX + enemy.x * this.tileSize + this.tileSize / 2;
+                    const py = offsetY + enemy.y * this.tileSize + this.tileSize / 2;
+                    
+                    const circle = this.add.circle(px, py, this.tileSize / 2, 0xFF0000);
+                    circle.setStrokeStyle(1, 0x800000);
+                    
+                    const text = this.add.text(px, py, 'E', {
+                        fontSize: `${this.tileSize - 2}px`,
+                        color: '#FFFFFF',
+                        fontStyle: 'bold'
+                    });
+                    text.setOrigin(0.5, 0.5);
+                });
+                
+                // 渲染障碍物
+                chunk.obstacles.forEach(obstacle => {
+                    const px = offsetX + obstacle.x * this.tileSize;
+                    const py = offsetY + obstacle.y * this.tileSize;
+                    
+                    const rect = this.add.rectangle(
+                        px, py,
+                        this.tileSize, this.tileSize,
+                        0x800080, 0.8
+                    );
+                    rect.setOrigin(0, 0);
+                    rect.setStrokeStyle(1, 0x400040);
+                });
+                
+                // 渲染收集品
+                chunk.collectibles.forEach(collectible => {
+                    const px = offsetX + collectible.x * this.tileSize + this.tileSize / 2;
+                    const py = offsetY + collectible.y * this.tileSize + this.tileSize / 2;
+                    
+                    const circle = this.add.circle(px, py, this.tileSize / 3, 0xFFD700);
+                    circle.setStrokeStyle(1, 0xFFA500);
+                });
+            }
+
+            updateInfo(sequence, totalWidth) {
+                const info = document.getElementById('info');
+                info.innerHTML = `
+                    <strong>关卡 ${this.currentLevel}</strong> |
+                    块序列: [${sequence.join(', ')}] |
+                    宽度: ${totalWidth}px (${totalWidth / this.tileSize} tiles) |
+                    高度: 240px (30 tiles) |
+                    缩放: ${(this.zoomLevel * 100).toFixed(0)}%
+                `;
+            }
+        }
+
+        // Phaser配置
+        const config = {
+            type: Phaser.AUTO,
+            width: 1200,
+            height: 300,
+            parent: 'game-container',
+            backgroundColor: '#87CEEB',
+            scene: MapScene,
+            pixelArt: true,
+            physics: {
+                default: 'arcade',
+                arcade: {
+                    debug: false
+                }
+            }
+        };
+
+        const game = new Phaser.Game(config);
+        const scene = game.scene.scenes[0];
+
+        // UI控制
+        document.getElementById('level-select').addEventListener('change', (e) => {
+            scene.loadLevel(parseInt(e.target.value));
+        });
+
+        document.getElementById('reload-btn').addEventListener('click', () => {
+            scene.loadLevel(scene.currentLevel);
+        });
+
+        document.getElementById('zoom-in').addEventListener('click', () => {
+            scene.zoomLevel = Math.min(3, scene.zoomLevel + 0.25);
+            scene.cameras.main.setZoom(scene.zoomLevel);
+            scene.updateInfo(scene.levelConfig.chunkSequences[scene.currentLevel], 0);
+        });
+
+        document.getElementById('zoom-out').addEventListener('click', () => {
+            scene.zoomLevel = Math.max(0.25, scene.zoomLevel - 0.25);
+            scene.cameras.main.setZoom(scene.zoomLevel);
+            scene.updateInfo(scene.levelConfig.chunkSequences[scene.currentLevel], 0);
+        });
+    </script>
+</body>
+</html>
