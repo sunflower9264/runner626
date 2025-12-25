@@ -326,7 +326,6 @@
             <button id="zoom-in">🔍+</button>
             <button id="zoom-out">🔍-</button>
             <button id="zoom-reset">↻ 重置视图</button>
-            <button id="grid-toggle" class="active">⊞ 网格</button>
             <button id="undo">↶ 撤销</button>
             <button id="redo">↷ 重做</button>
             <span style="color: white; margin-left: auto; font-size: 13px;" id="coords"></span>
@@ -372,8 +371,8 @@
                 this.terrain = [];
                 this.entities = { enemies: [], obstacles: [], collectibles: [] };
                 this.history = [];
-                this.historyIndex = -1;
-                this.isDragging = false;
+                this.historyIndex = -1;                this.isDragging = false;
+                this.spaceKeyDown = false;                this.isDragging = false;
             }
 
             preload() {
@@ -527,7 +526,7 @@
             setupInput() {
                 // 鼠标点击
                 this.input.on('pointerdown', (pointer) => {
-                    if (pointer.button === 1) { // 中键
+                    if (this.spaceKeyDown && pointer.button === 0) { // 空格+左键拖拽
                         this.isDragging = true;
                         return;
                     }
@@ -559,10 +558,10 @@
                     document.getElementById('coords').textContent = 
                         `X: ${tileX} Y: ${tileY} | Tile: ${this.terrain[tileY]?.[tileX] || 0}`;
                     
-                    if (this.isDragging && pointer.isDown && pointer.button === 1) {
+                    if (this.isDragging && pointer.isDown) {
                         this.cameras.main.scrollX -= pointer.velocity.x / this.zoomLevel;
                         this.cameras.main.scrollY -= pointer.velocity.y / this.zoomLevel;
-                    } else if (pointer.isDown && pointer.button === 0) {
+                    } else if (pointer.isDown && pointer.button === 0 && !this.spaceKeyDown) {
                         if (tileX >= 0 && tileX < this.gridSize && tileY >= 0 && tileY < this.gridHeight) {
                             this.handlePaint(tileX, tileY);
                             this.renderMap();
@@ -577,6 +576,16 @@
                 
                 // 禁用右键菜单
                 this.input.mouse.disableContextMenu();
+                
+                // 键盘控制
+                this.input.keyboard.on('keydown-SPACE', () => {
+                    this.spaceKeyDown = true;
+                });
+                
+                this.input.keyboard.on('keyup-SPACE', () => {
+                    this.spaceKeyDown = false;
+                    this.isDragging = false;
+                });
                 
                 // 滚轮缩放
                 this.input.on('wheel', (pointer, gameObjects, deltaX, deltaY) => {
@@ -717,125 +726,118 @@
         };
 
         const game = new Phaser.Game(config);
-        const scene = game.scene.scenes[0];
+        
+        // 等待场景创建完成后再设置所有UI控制
+        game.events.once('ready', () => {
+            const scene = game.scene.scenes[0];
 
-        // 初始化tile调色板
-        function initTilePalette() {
-            const palette = document.getElementById('tile-palette');
-            Object.entries(TILE_COLORS).forEach(([value, info]) => {
-                const btn = document.createElement('div');
-                btn.className = 'tile-button';
-                if (parseInt(value) === scene.currentTile) {
-                    btn.classList.add('active');
-                }
-                btn.dataset.tile = value;
-                btn.style.backgroundColor = '#' + info.color.toString(16).padStart(6, '0');
-                btn.textContent = info.name;
-                btn.onclick = () => {
-                    scene.currentTile = parseInt(value);
-                    document.querySelectorAll('.tile-button').forEach(b => b.classList.remove('active'));
-                    btn.classList.add('active');
-                };
-                palette.appendChild(btn);
-            });
-        }
-
-        // 初始化chunk选择器
-        function updateChunkSelect() {
-            const select = document.getElementById('chunk-select');
-            select.innerHTML = '';
-            for (let i = 0; i < 6; i++) {
-                const option = document.createElement('option');
-                option.value = i;
-                option.textContent = `Chunk ${i}`;
-                select.appendChild(option);
+            // 初始化tile调色板
+            function initTilePalette() {
+                const palette = document.getElementById('tile-palette');
+                Object.entries(TILE_COLORS).forEach(([value, info]) => {
+                    const btn = document.createElement('div');
+                    btn.className = 'tile-button';
+                    if (parseInt(value) === scene.currentTile) {
+                        btn.classList.add('active');
+                    }
+                    btn.dataset.tile = value;
+                    btn.style.backgroundColor = '#' + info.color.toString(16).padStart(6, '0');
+                    btn.textContent = info.name;
+                    btn.onclick = () => {
+                        scene.currentTile = parseInt(value);
+                        document.querySelectorAll('.tile-button').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                    };
+                    palette.appendChild(btn);
+                });
             }
-            select.value = scene.currentChunk;
-        }
 
-        // UI事件
-        document.getElementById('stage-select').addEventListener('change', (e) => {
-            scene.loadChunk(parseInt(e.target.value), scene.currentChunk);
-        });
+            // 初始化chunk选择器
+            function updateChunkSelect() {
+                const select = document.getElementById('chunk-select');
+                select.innerHTML = '';
+                for (let i = 0; i < 6; i++) {
+                    const option = document.createElement('option');
+                    option.value = i;
+                    option.textContent = `Chunk ${i}`;
+                    select.appendChild(option);
+                }
+                select.value = scene.currentChunk;
+            }
 
-        document.getElementById('chunk-select').addEventListener('change', (e) => {
-            scene.loadChunk(scene.currentStage, parseInt(e.target.value));
-        });
+            // UI事件
+            document.getElementById('stage-select').addEventListener('change', (e) => {
+                scene.loadChunk(parseInt(e.target.value), scene.currentChunk);
+            });
 
-        document.getElementById('tool-select').addEventListener('change', (e) => {
-            scene.currentTool = e.target.value;
-        });
+            document.getElementById('chunk-select').addEventListener('change', (e) => {
+                scene.loadChunk(scene.currentStage, parseInt(e.target.value));
+            });
 
-        document.getElementById('new-chunk').addEventListener('click', () => {
-            scene.initEmptyTerrain();
-            scene.entities = { enemies: [], obstacles: [], collectibles: [] };
-            scene.renderMap();
-            scene.saveHistory();
-            scene.updateStatus('创建新chunk');
-        });
+            document.getElementById('tool-select').addEventListener('change', (e) => {
+                scene.currentTool = e.target.value;
+            });
 
-        document.getElementById('clear-chunk').addEventListener('click', () => {
-            if (confirm('确定要清空当前chunk吗？')) {
+            document.getElementById('new-chunk').addEventListener('click', () => {
                 scene.initEmptyTerrain();
                 scene.entities = { enemies: [], obstacles: [], collectibles: [] };
                 scene.renderMap();
                 scene.saveHistory();
-                scene.updateStatus('清空chunk');
-            }
-        });
+                scene.updateStatus('创建新chunk');
+            });
 
-        document.getElementById('save-json').addEventListener('click', () => {
-            scene.exportJSON();
-        });
+            document.getElementById('clear-chunk').addEventListener('click', () => {
+                if (confirm('确定要清空当前chunk吗？')) {
+                    scene.initEmptyTerrain();
+                    scene.entities = { enemies: [], obstacles: [], collectibles: [] };
+                    scene.renderMap();
+                    scene.saveHistory();
+                    scene.updateStatus('清空chunk');
+                }
+            });
 
-        document.getElementById('zoom-in').addEventListener('click', () => {
-            scene.zoomLevel = Math.min(4, scene.zoomLevel + 0.25);
-            scene.cameras.main.setZoom(scene.zoomLevel);
-        });
-
-        document.getElementById('zoom-out').addEventListener('click', () => {
-            scene.zoomLevel = Math.max(0.5, scene.zoomLevel - 0.25);
-            scene.cameras.main.setZoom(scene.zoomLevel);
-        });
-
-        document.getElementById('zoom-reset').addEventListener('click', () => {
-            scene.zoomLevel = 1.5;
-            scene.cameras.main.setZoom(scene.zoomLevel);
-            scene.cameras.main.scrollX = 0;
-            scene.cameras.main.scrollY = 0;
-        });
-
-        document.getElementById('grid-toggle').addEventListener('click', (e) => {
-            scene.showGrid = !scene.showGrid;
-            e.target.classList.toggle('active');
-            scene.renderMap();
-        });
-
-        document.getElementById('undo').addEventListener('click', () => scene.undo());
-        document.getElementById('redo').addEventListener('click', () => scene.redo());
-
-        // 键盘快捷键
-        document.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'z') {
-                e.preventDefault();
-                scene.undo();
-            } else if (e.ctrlKey && e.key === 'y') {
-                e.preventDefault();
-                scene.redo();
-            } else if (e.ctrlKey && e.key === 's') {
-                e.preventDefault();
+            document.getElementById('save-json').addEventListener('click', () => {
                 scene.exportJSON();
-            } else if (e.key === ' ') {
-                e.preventDefault();
-                document.getElementById('grid-toggle').click();
-            }
-        });
+            });
 
-        // 初始化
-        setTimeout(() => {
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                scene.zoomLevel = Math.min(4, scene.zoomLevel + 0.25);
+                scene.cameras.main.setZoom(scene.zoomLevel);
+            });
+
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                scene.zoomLevel = Math.max(0.5, scene.zoomLevel - 0.25);
+                scene.cameras.main.setZoom(scene.zoomLevel);
+            });
+
+            document.getElementById('zoom-reset').addEventListener('click', () => {
+                scene.zoomLevel = 1.5;
+                scene.cameras.main.setZoom(scene.zoomLevel);
+                scene.cameras.main.scrollX = 0;
+                scene.cameras.main.scrollY = 0;
+            });
+
+            document.getElementById('undo').addEventListener('click', () => scene.undo());
+            document.getElementById('redo').addEventListener('click', () => scene.redo());
+
+            // 键盘快捷键
+            document.addEventListener('keydown', (e) => {
+                if (e.ctrlKey && e.key === 'z') {
+                    e.preventDefault();
+                    scene.undo();
+                } else if (e.ctrlKey && e.key === 'y') {
+                    e.preventDefault();
+                    scene.redo();
+                } else if (e.ctrlKey && e.key === 's') {
+                    e.preventDefault();
+                    scene.exportJSON();
+                }
+            });
+
+            // 初始化
             initTilePalette();
             updateChunkSelect();
-        }, 500);
+        });
     </script>
 </body>
 </html>

@@ -276,7 +276,7 @@
                 // 设置相机控制
                 this.cameras.main.setZoom(this.zoomLevel);
                 
-                // 添加拖拽控制
+                // 添加拖拽控制 - 直接鼠标拖拽
                 this.input.on('pointermove', (pointer) => {
                     if (pointer.isDown) {
                         this.cameras.main.scrollX -= (pointer.x - pointer.prevPosition.x) / this.zoomLevel;
@@ -433,27 +433,31 @@
         };
 
         const game = new Phaser.Game(config);
-        const scene = game.scene.scenes[0];
+        
+        // 等待场景创建完成后再设置UI控制
+        game.events.once('ready', () => {
+            const scene = game.scene.scenes[0];
 
-        // UI控制
-        document.getElementById('level-select').addEventListener('change', (e) => {
-            scene.loadLevel(parseInt(e.target.value));
-        });
+            // UI控制
+            document.getElementById('level-select').addEventListener('change', (e) => {
+                scene.loadLevel(parseInt(e.target.value));
+            });
 
-        document.getElementById('reload-btn').addEventListener('click', () => {
-            scene.loadLevel(scene.currentLevel);
-        });
+            document.getElementById('reload-btn').addEventListener('click', () => {
+                scene.loadLevel(scene.currentLevel);
+            });
 
-        document.getElementById('zoom-in').addEventListener('click', () => {
-            scene.zoomLevel = Math.min(3, scene.zoomLevel + 0.25);
-            scene.cameras.main.setZoom(scene.zoomLevel);
-            scene.updateInfo(scene.levelConfig.chunkSequences[scene.currentLevel], 0);
-        });
+            document.getElementById('zoom-in').addEventListener('click', () => {
+                scene.zoomLevel = Math.min(3, scene.zoomLevel + 0.25);
+                scene.cameras.main.setZoom(scene.zoomLevel);
+                scene.updateInfo(scene.levelConfig.chunkSequences[scene.currentLevel], 0);
+            });
 
-        document.getElementById('zoom-out').addEventListener('click', () => {
-            scene.zoomLevel = Math.max(0.25, scene.zoomLevel - 0.25);
-            scene.cameras.main.setZoom(scene.zoomLevel);
-            scene.updateInfo(scene.levelConfig.chunkSequences[scene.currentLevel], 0);
+            document.getElementById('zoom-out').addEventListener('click', () => {
+                scene.zoomLevel = Math.max(0.25, scene.zoomLevel - 0.25);
+                scene.cameras.main.setZoom(scene.zoomLevel);
+                scene.updateInfo(scene.levelConfig.chunkSequences[scene.currentLevel], 0);
+            });
         });
     </script>
 </body>
