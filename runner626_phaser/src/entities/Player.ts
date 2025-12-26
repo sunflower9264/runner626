@@ -1,11 +1,14 @@
 import Phaser from 'phaser';
 
-export type PlayerState = 'running' | 'charging' | 'airborne' | 'sliding' | 'dead';
+export type PlayerState = 'running' | 'airborne' | 'sliding' | 'dead';
 
 export class Player {
   private readonly sprite: Phaser.Physics.Arcade.Sprite;
   private state: PlayerState = 'running';
-  private chargeMs = 0;
+  private jumpTimer = 0;
+  private isJumping = false;
+  private readonly maxJumpTime = 350; // ms
+  public speedMultiplier = 1;
 
   // Store original body dimensions
   private readonly normalBodyH = 44;
@@ -31,6 +34,14 @@ export class Player {
     return this.sprite;
   }
 
+  get x(): number {
+    return this.sprite.x;
+  }
+
+  set x(value: number) {
+    this.sprite.x = value;
+  }
+
   get isDead(): boolean {
     return this.state === 'dead';
   }
@@ -40,20 +51,33 @@ export class Player {
   }
 
   update(deltaMs: number): void {
+    // Reset speed multiplier every frame (will be set by SpeedStrip if overlapping)
+    this.speedMultiplier = 1;
+
     if (this.state === 'dead') return;
 
     const onGround = this.body.blocked.down || this.body.touching.down;
-    if (onGround && this.state === 'airborne') {
-      this.state = 'running';
-      this.chargeMs = 0;
+
+    if (onGround) {
+      this.isJumping = false;
+      if (this.state === 'airborne') {
+        this.state = 'running';
+      }
     }
 
-    if (this.state === 'charging') {
-      this.chargeMs = Math.min(this.chargeMs + deltaMs, 550);
-      // Visual feedback: squash a bit
-      const t = this.chargeMs / 550;
-      this.sprite.setScale(1.0 + 0.08 * t, 1.0 - 0.08 * t);
-    } else if (this.state === 'sliding') {
+    // Variable jump height logic
+    if (this.isJumping) {
+      this.jumpTimer += deltaMs;
+      if (this.jumpTimer < this.maxJumpTime) {
+        // Apply upward force (gravity compensation) while holding jump
+        // This makes the jump higher the longer you hold
+        this.body.velocity.y -= 15 * (deltaMs / 16);
+      } else {
+        this.isJumping = false;
+      }
+    }
+
+    if (this.state === 'sliding') {
       // Flatten sprite
       this.sprite.setScale(1.2, 0.5);
     } else {
@@ -61,30 +85,34 @@ export class Player {
     }
   }
 
-  tryStartCharge(): void {
+  startJump(currentSpeed: number): void {
     if (this.state === 'dead' || this.state === 'sliding') return;
 
     const onGround = this.body.blocked.down || this.body.touching.down;
     if (!onGround) return;
 
-    this.state = 'charging';
-    this.chargeMs = 0;
-  }
+    this.state = 'airborne';
+    this.isJumping = true;
+    this.jumpTimer = 0;
 
-  tryReleaseJump(): void {
-    if (this.state !== 'charging') return;
+    // Base jump velocity
+    let jumpVelocity = -400;
 
-    // Variable jump based on hold time (single-button feel)
-    const t = Phaser.Math.Clamp(this.chargeMs / 550, 0, 1);
-    const jumpVelocity = -520 - 380 * t;
+    // Speed bonus: faster speed = higher jump
+    // Assuming speed ranges from ~200 to ~450
+    const speedBonus = (currentSpeed - 200) * 0.6;
+    jumpVelocity -= Math.max(0, speedBonus);
 
     this.body.setVelocityY(jumpVelocity);
-    this.state = 'airborne';
+  }
+
+  stopJump(): void {
+    this.isJumping = false;
   }
 
   /** Start sliding (duck) - shrink hitbox */
   startSlide(): void {
-    if (this.state === 'dead' || this.state === 'airborne' || this.state === 'charging') return;
+    if (this.state === 'dead' || this.state === 'airborne') return;
     if (this.state === 'sliding') return;
 
     this.state = 'sliding';

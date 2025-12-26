@@ -69,5 +69,56 @@ export class BootScene extends Phaser.Scene {
     g.generateTexture('chip', 10, 10);
 
     g.destroy();
+
+    // Map Elements
+    const g2 = this.add.graphics();
+
+    // Ground Tile (8x8)
+    g2.fillStyle(0x8b4513, 1); // Brown
+    g2.fillRect(0, 0, 8, 8);
+    g2.generateTexture('ground_tile', 8, 8);
+
+    // Trap (Spike)
+    g2.clear();
+    g2.fillStyle(0xff0000, 1);
+    g2.beginPath();
+    g2.moveTo(0, 8);
+    g2.lineTo(4, 0);
+    g2.lineTo(8, 8);
+    g2.closePath();
+    g2.fillPath();
+    g2.generateTexture('trap', 8, 8);
+
+    // Bounce Ball
+    g2.clear();
+    g2.fillStyle(0x00ff00, 1);
+    g2.fillCircle(4, 4, 4);
+    g2.generateTexture('bounce_ball', 8, 8);
+
+    // Speed Strip (Fast)
+    g2.clear();
+    g2.fillStyle(0xffff00, 0.8);
+    g2.fillRect(0, 0, 8, 8);
+    g2.generateTexture('speed_strip', 8, 8);
+
+    // Speed Strip (Slow)
+    g2.clear();
+    g2.fillStyle(0x0000ff, 0.8);
+    g2.fillRect(0, 0, 8, 8);
+    g2.generateTexture('slow_strip', 8, 8);
+
+    // Gate
+    g2.clear();
+    g2.fillStyle(0x555555, 1);
+    g2.fillRect(0, 0, 8, 24); // Tall gate
+    g2.generateTexture('gate', 8, 24);
+
+    // Switch
+    g2.clear();
+    g2.fillStyle(0xff00ff, 1);
+    g2.fillRect(0, 0, 8, 8);
+    g2.generateTexture('switch', 8, 8);
+
+    g2.destroy();
   }
 }

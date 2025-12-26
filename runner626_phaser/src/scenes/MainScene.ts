@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
 import { Player } from '../entities/Player';
 import { CONTROL_HINT, WORLD } from '../game/constants';
+import { MapManager } from '../game/MapManager';
+import { MapElement } from '../entities/MapElements';
 
 type RunState = 'running' | 'paused' | 'gameover';
-type ObstacleType = 'normal' | 'tall' | 'wide';
 
 export class MainScene extends Phaser.Scene {
   private player!: Player;
-  private ground!: Phaser.Physics.Arcade.StaticGroup;
-  private obstacles!: Phaser.Physics.Arcade.Group;
+  private mapManager!: MapManager;
 
   private runState: RunState = 'running';
   private baseSpeed = 220;
@@ -27,10 +27,8 @@ export class MainScene extends Phaser.Scene {
   private hintText!: Phaser.GameObjects.Text;
   private overlayText!: Phaser.GameObjects.Text;
 
-  private spawnTimer = 0;
-
   // Parallax background layers
-  private bgBuildings: Phaser.GameObjects.Image[] = [];
+
 
   constructor() {
     super('main');
@@ -40,18 +38,30 @@ export class MainScene extends Phaser.Scene {
     this.physics.world.setBounds(0, 0, WORLD.width, WORLD.height);
 
     this.createBackground();
-    this.createGround();
+
+    this.mapManager = new MapManager(this);
+    this.mapManager.loadLevel(0); // Load level 0 by default
+
     this.createPlayer();
-    this.createObstacles();
     this.createUI();
     this.createControls();
+
+    // Collisions
+    this.physics.add.collider(this.player.displayObject, this.mapManager.getGroundGroup());
+
+    this.physics.add.overlap(
+      this.player.displayObject,
+      this.mapManager.getElementsGroup(),
+      (player, obj) => this.onMapElementOverlap(player, obj),
+      undefined,
+      this
+    );
 
     this.runState = 'running';
     this.lives = 3;
     this.invincibleUntil = 0;
     this.distance = 0;
     this.speedPxPerSec = this.baseSpeed;
-    this.spawnTimer = 0;
   }
 
   update(time: number, deltaMs: number): void {
@@ -63,83 +73,24 @@ export class MainScene extends Phaser.Scene {
 
     this.player.update(deltaMs);
     this.updateUI();
-    this.updateParallax(deltaMs);
+
+  }
+
+  private onMapElementOverlap(playerGO: Phaser.GameObjects.GameObject, elementGO: Phaser.GameObjects.GameObject) {
+    const element = elementGO.getData('element') as MapElement;
+    if (element) {
+      element.onOverlap(this.player);
+    }
   }
 
   private createBackground(): void {
-    this.add.image(0, 0, 'bg_far').setOrigin(0, 0).setDepth(-10);
-
-    // 3 building silhouettes for parallax
-    for (let i = 0; i < 4; i++) {
-      const b = this.add
-        .image(i * 130, WORLD.groundY, 'bg_building')
-        .setOrigin(0, 1)
-        .setDepth(-5)
-        .setAlpha(0.5 + Math.random() * 0.3)
-        .setScale(0.8 + Math.random() * 0.5, 0.6 + Math.random() * 0.6);
-      this.bgBuildings.push(b);
-    }
+    this.cameras.main.setBackgroundColor('#1e1e2e');
   }
 
-  private updateParallax(deltaMs: number): void {
-    const parallaxSpeed = this.speedPxPerSec * 0.25 * (deltaMs / 1000);
-    for (const b of this.bgBuildings) {
-      b.x -= parallaxSpeed;
-      if (b.x < -140) {
-        b.x += 4 * 130 + 50;
-        b.setScale(0.8 + Math.random() * 0.5, 0.6 + Math.random() * 0.6);
-      }
-    }
-  }
 
-  private createGround(): void {
-    this.ground = this.physics.add.staticGroup();
-
-    // Tile ground across width
-    const tileW = 64;
-    for (let x = 0; x <= WORLD.width + tileW; x += tileW) {
-      const tile = this.ground.create(x, WORLD.groundY, 'ground');
-      tile.setOrigin(0, 0);
-      tile.refreshBody();
-    }
-  }
 
   private createPlayer(): void {
     this.player = new Player(this, 80, WORLD.groundY);
-    this.physics.add.collider(this.player.displayObject, this.ground);
-  }
-
-  private createObstacles(): void {
-    this.obstacles = this.physics.add.group({
-      immovable: true,
-      allowGravity: false,
-    });
-
-    this.physics.add.overlap(
-      this.player.displayObject,
-      this.obstacles,
-      () => this.onHitObstacle(),
-      undefined,
-      this
-    );
-  }
-
-  private onHitObstacle(): void {
-    if (this.runState !== 'running') return;
-    const now = this.time.now;
-    if (now < this.invincibleUntil) return;
-
-    this.lives--;
-    if (this.lives <= 0) {
-      this.player.die();
-      this.runState = 'gameover';
-      this.overlayText.setText('游戏结束\n按 R 重开');
-      this.overlayText.setVisible(true);
-    } else {
-      // Short invincibility
-      this.invincibleUntil = now + 1500;
-      this.player.flash();
-    }
   }
 
   private createUI(): void {
@@ -149,11 +100,11 @@ export class MainScene extends Phaser.Scene {
       color: '#ffffff',
     };
 
-    this.scoreText = this.add.text(12, 12, '距离: 0', style).setDepth(10);
-    this.livesText = this.add.text(12, 34, '❤️ 3', { ...style, fontSize: '18px' }).setDepth(10);
+    this.scoreText = this.add.text(12, 12, '距离: 0', style).setDepth(10).setScrollFactor(0);
+    this.livesText = this.add.text(12, 34, '❤️ 3', { ...style, fontSize: '18px' }).setDepth(10).setScrollFactor(0);
     this.hintText = this.add
       .text(12, 58, CONTROL_HINT, { ...style, fontSize: '13px', color: '#aaaaaa' })
-      .setDepth(10);
+      .setDepth(10).setScrollFactor(0);
 
     this.overlayText = this.add
       .text(WORLD.width / 2, WORLD.height / 2, '', {
@@ -163,7 +114,8 @@ export class MainScene extends Phaser.Scene {
       })
       .setOrigin(0.5, 0.5)
       .setDepth(20)
-      .setVisible(false);
+      .setVisible(false)
+      .setScrollFactor(0);
   }
 
   private createControls(): void {
@@ -186,21 +138,21 @@ export class MainScene extends Phaser.Scene {
     // Also support pointer as the single action button
     this.input.on('pointerdown', () => {
       if (this.runState !== 'running') return;
-      this.player.tryStartCharge();
+      this.player.startJump(this.speedPxPerSec);
     });
     this.input.on('pointerup', () => {
       if (this.runState !== 'running') return;
-      this.player.tryReleaseJump();
+      this.player.stopJump();
     });
   }
 
   private tickRunner(time: number, deltaMs: number): void {
     // Action key: hold -> charge, release -> jump
     if (Phaser.Input.Keyboard.JustDown(this.actionKey)) {
-      this.player.tryStartCharge();
+      this.player.startJump(this.speedPxPerSec);
     }
     if (Phaser.Input.Keyboard.JustUp(this.actionKey)) {
-      this.player.tryReleaseJump();
+      this.player.stopJump();
     }
 
     // Slide key (DOWN arrow)
@@ -213,94 +165,12 @@ export class MainScene extends Phaser.Scene {
     // Pause
     if (Phaser.Input.Keyboard.JustDown(this.pauseKey)) {
       this.togglePause();
-    }
-
-    // Restart
-    if (Phaser.Input.Keyboard.JustDown(this.restartKey)) {
-      this.scene.restart();
-      return;
-    }
-
-    // World scroll + score
-    const deltaSec = deltaMs / 1000;
-    this.distance += this.speedPxPerSec * deltaSec;
-
-    // Gradually increase speed (cap at 450)
-    this.speedPxPerSec = Math.min(this.baseSpeed + this.distance / 18, 450);
-
-    // Spawn obstacles
-    this.spawnTimer += deltaMs;
-    const spawnInterval = Phaser.Math.Clamp(1000 - this.distance / 30, 480, 1000);
-    if (this.spawnTimer >= spawnInterval) {
-      this.spawnTimer = 0;
-      this.spawnObstacle();
-    }
-
-    // Move obstacles left
-    const dx = this.speedPxPerSec * deltaSec;
-    this.obstacles.children.each((child) => {
-      const obj = child as Phaser.Physics.Arcade.Image;
-      obj.x -= dx;
-      if (obj.x < -80) {
-        obj.destroy();
+      if (this.runState === 'paused') {
+        this.overlayText.setText('已暂停');
+        this.overlayText.setVisible(true);
+      } else if (this.runState === 'running') {
+        this.overlayText.setVisible(false);
       }
-      return true;
-    });
-
-    // Flicker player if invincible
-    if (time < this.invincibleUntil && Math.floor(time / 80) % 2 === 0) {
-      this.player.displayObject.setAlpha(0.4);
-    } else {
-      this.player.displayObject.setAlpha(1);
-    }
-  }
-
-  private spawnObstacle(): void {
-    const x = WORLD.width + 40;
-    const y = WORLD.groundY;
-
-    // Randomly pick obstacle type
-    const roll = Math.random();
-    let obsType: ObstacleType;
-    let textureKey: string;
-    let bodyW: number;
-    let bodyH: number;
-    let originY = 1;
-
-    if (roll < 0.55) {
-      obsType = 'normal';
-      textureKey = 'obstacle';
-      bodyW = 24;
-      bodyH = 40;
-    } else if (roll < 0.8) {
-      obsType = 'tall';
-      textureKey = 'obstacle_tall';
-      bodyW = 20;
-      bodyH = 68;
-    } else {
-      obsType = 'wide';
-      textureKey = 'obstacle_wide';
-      bodyW = 56;
-      bodyH = 24;
-    }
-
-    const obs = this.obstacles.create(x, y, textureKey) as Phaser.Physics.Arcade.Image;
-    obs.setOrigin(0.5, originY);
-    obs.setImmovable(true);
-    const obsBody = obs.body as Phaser.Physics.Arcade.Body;
-    obsBody.setSize(bodyW, bodyH);
-    obsBody.setOffset((obs.width - bodyW) / 2, obs.height - bodyH);
-  }
-
-  private updateUI(): void {
-    this.scoreText.setText(`距离: ${Math.floor(this.distance)}`);
-    this.livesText.setText(`❤️ ${this.lives}`);
-
-    if (this.runState === 'paused') {
-      this.overlayText.setText('已暂停');
-      this.overlayText.setVisible(true);
-    } else if (this.runState === 'running') {
-      this.overlayText.setVisible(false);
     }
   }
 
@@ -313,5 +183,22 @@ export class MainScene extends Phaser.Scene {
     }
 
     this.runState = 'paused';
+  }
+
+  private updateUI(): void {
+    if (this.scoreText) {
+      this.scoreText.setText(`距离: ${Math.floor(this.distance)}`);
+    }
+
+    if (this.livesText) {
+      this.livesText.setText(`❤️ ${this.lives}`);
+    }
+
+    if (this.overlayText) {
+      if (this.runState === 'gameover') {
+        this.overlayText.setText('游戏结束\n按 R 重开');
+        this.overlayText.setVisible(true);
+      }
+    }
   }
 }
