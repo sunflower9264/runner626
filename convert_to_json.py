@@ -10,7 +10,18 @@ import numpy as np
 
 
 def convert_stage_to_json(stage_file, resources_dir='resources'):
-    """将stage.bin转换为JSON"""
+    """将stage.bin转换为JSON
+    
+    根据c.java中a(String str)方法的读取逻辑:
+    - f79v = chunkWidth (第二个int读取的值)
+    - f80w = chunkHeight (第三个int读取的值)
+    - f86a = new byte[numChunks][width][height]
+    - 读取顺序: 外循环y(height), 内循环x(width)
+    - 存储方式: f86a[chunk][x][y] = byte
+    
+    所以文件中数据是按行(y)读取，但存储到[x][y]
+    我们按相同方式读取后，输出为[y][x]的二维数组便于可视化
+    """
     filepath = os.path.join(resources_dir, stage_file)
     
     print(f"转换: {stage_file}")
@@ -18,20 +29,34 @@ def convert_stage_to_json(stage_file, resources_dir='resources'):
     with open(filepath, 'rb') as f:
         # 读取基本信息
         num_chunks = struct.unpack('>i', f.read(4))[0]
-        chunk_width = struct.unpack('>i', f.read(4))[0]
-        chunk_height = struct.unpack('>i', f.read(4))[0]
+        chunk_width = struct.unpack('>i', f.read(4))[0]   # f79v - X方向的格子数
+        chunk_height = struct.unpack('>i', f.read(4))[0]  # f80w - Y方向的格子数
+        
+        print(f"  块数量: {num_chunks}, 宽度: {chunk_width}, 高度: {chunk_height}")
         
         # 读取地形块数据
+        # Java代码中: 外循环i4遍历height(y), 内循环i5遍历width(x)
+        # 存储为 f86a[chunk][x][y]
+        # 我们按相同顺序读取，然后转换为[y][x]格式输出
         chunks = []
-        for i in range(num_chunks):
-            chunk = []
+        for chunk_idx in range(num_chunks):
+            # 初始化一个[width][height]的临时数组，模拟Java的存储方式
+            temp_chunk = [[0 for _ in range(chunk_height)] for _ in range(chunk_width)]
+            
+            # 按Java代码的读取顺序: 外层y, 内层x
             for y in range(chunk_height):
-                row = []
                 for x in range(chunk_width):
                     tile_value = struct.unpack('b', f.read(1))[0]
                     if tile_value < 0:
                         tile_value += 256
-                    row.append(tile_value)
+                    temp_chunk[x][y] = tile_value  # 存储到[x][y]
+            
+            # 转换为[y][x]格式，便于显示 (行优先)
+            chunk = []
+            for y in range(chunk_height):
+                row = []
+                for x in range(chunk_width):
+                    row.append(temp_chunk[x][y])
                 chunk.append(row)
             chunks.append(chunk)
         
@@ -122,7 +147,7 @@ def convert_stage_to_json(stage_file, resources_dir='resources'):
 
 def convert_all_stages():
     """转换所有stage文件"""
-    resources_dir = 'resources'
+    resources_dir = 'source/resources'
     output_dir = 'map_data'
     os.makedirs(output_dir, exist_ok=True)
     
@@ -171,7 +196,7 @@ def convert_all_stages():
             print(f"⚠️  跳过: {stage_file}")
             continue
         
-        data = convert_stage_to_json(stage_file)
+        data = convert_stage_to_json(stage_file, resources_dir)
         
         output_path = os.path.join(output_dir, f'stage{i}.json')
         with open(output_path, 'w', encoding='utf-8') as f:

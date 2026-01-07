@@ -380,6 +380,12 @@
                 for (let i = 0; i < 5; i++) {
                     this.load.json(`stage${i}`, `../map_data/stage${i}.json`);
                 }
+                
+                // 预加载plano1 sprites (地形)
+                // plano1有55个sprite，tile值0-54是原始，55-108是水平翻转，109-162是垂直翻转
+                for (let i = 0; i < 55; i++) {
+                    this.load.image(`tile_${i}`, `sprites/plano1/sprite_${i.toString().padStart(3, '0')}.png`);
+                }
             }
 
             create() {
@@ -447,22 +453,57 @@
                 }
                 
                 // 绘制地形
+                // plano1有55个sprite，tile值映射:
+                // 0-54: 原始sprite
+                // 55-108: 水平翻转 (sprite = tile - 55)
+                // 109-162: 垂直翻转 (sprite = tile - 109)
+                const NUM_SPRITES = 55;
+                
                 for (let y = 0; y < this.gridHeight; y++) {
                     for (let x = 0; x < this.gridSize; x++) {
                         const tileValue = this.terrain[y][x];
                         if (tileValue === 0) continue;
                         
-                        const tileInfo = TILE_COLORS[tileValue] || { color: 0x505050, alpha: 1 };
-                        const rect = this.add.rectangle(
-                            x * this.tileSize,
-                            y * this.tileSize,
-                            this.tileSize,
-                            this.tileSize,
-                            tileInfo.color,
-                            tileInfo.alpha
-                        );
-                        rect.setOrigin(0, 0);
-                        rect.setStrokeStyle(1, 0x000000, 0.3);
+                        const px = x * this.tileSize;
+                        const py = y * this.tileSize;
+                        
+                        // 计算sprite索引和翻转
+                        let spriteIndex = tileValue;
+                        let flipX = false;
+                        let flipY = false;
+                        
+                        if (tileValue >= NUM_SPRITES * 2) {
+                            // 垂直翻转
+                            spriteIndex = tileValue - NUM_SPRITES * 2;
+                            flipY = true;
+                        } else if (tileValue >= NUM_SPRITES) {
+                            // 水平翻转
+                            spriteIndex = tileValue - NUM_SPRITES;
+                            flipX = true;
+                        }
+                        
+                        // 尝试使用sprite图片
+                        const textureKey = `tile_${spriteIndex}`;
+                        if (this.textures.exists(textureKey)) {
+                            const sprite = this.add.image(px, py, textureKey);
+                            sprite.setOrigin(0, 0);
+                            sprite.setFlipX(flipX);
+                            sprite.setFlipY(flipY);
+                            // 缩放到tileSize (编辑器用16px)
+                            sprite.setDisplaySize(this.tileSize, this.tileSize);
+                        } else {
+                            // 回退到颜色方块
+                            const tileInfo = TILE_COLORS[tileValue] || { color: 0x505050, alpha: 1 };
+                            const rect = this.add.rectangle(
+                                px, py,
+                                this.tileSize,
+                                this.tileSize,
+                                tileInfo.color,
+                                tileInfo.alpha
+                            );
+                            rect.setOrigin(0, 0);
+                            rect.setStrokeStyle(1, 0x000000, 0.3);
+                        }
                     }
                 }
                 

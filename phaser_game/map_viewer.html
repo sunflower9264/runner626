@@ -164,39 +164,39 @@
     <div id="game-container"></div>
     
     <div class="legend">
-        <h3>🎨 地形颜色图例</h3>
+        <h3>🎨 地形颜色图例 (Tile值=Sprite索引)</h3>
         <div class="legend-grid">
             <div class="legend-item">
                 <div class="legend-color" style="background: #8B4513"></div>
-                <span>普通地面</span>
+                <span>主地形 (42)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background: #00FF00"></div>
-                <span>地面顶部</span>
+                <div class="legend-color" style="background: #A0522D"></div>
+                <span>地形变体 (1-6)</span>
+            </div>
+            <div class="legend-item">
+                <div class="legend-color" style="background: #654321"></div>
+                <span>平台边缘 (23,41)</span>
             </div>
             <div class="legend-item">
                 <div class="legend-color" style="background: #696969"></div>
-                <span>金属平台</span>
+                <span>金属平台 (7-11)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background: #FFA500"></div>
-                <span>特殊平台</span>
+                <div class="legend-color" style="background: #9370DB"></div>
+                <span>切换平台 (12,18)</span>
             </div>
             <div class="legend-item">
                 <div class="legend-color" style="background: #FF0000"></div>
-                <span>尖刺/陷阱</span>
+                <span>尖刺陷阱 (35,39,48,131)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background: #FFD700"></div>
-                <span>收集品</span>
+                <div class="legend-color" style="background: #CD853F"></div>
+                <span>可破坏物 (89,102,132)</span>
             </div>
             <div class="legend-item">
-                <div class="legend-color" style="background: #40E0D0"></div>
-                <span>液体</span>
-            </div>
-            <div class="legend-item">
-                <div class="legend-color" style="background: #800080"></div>
-                <span>障碍物</span>
+                <div class="legend-color" style="background: #C0C0C0"></div>
+                <span>装饰物 (95等)</span>
             </div>
             <div class="legend-item">
                 <div class="legend-color" style="background: #FF0000; border-radius: 50%"></div>
@@ -206,46 +206,80 @@
     </div>
 
     <script type="module">
-        // Tile颜色映射 - 与Python版本一致
-        const TILE_COLORS = {
-            0: 0x00000000,      // 空气 - 透明
-            1: 0x8B4513,        // 普通地面 - 棕色
-            2: 0xA0522D,        // 地面变种
-            7: 0x696969,        // 金属平台 - 灰色
-            8: 0x696969,
-            9: 0x696969,
-            10: 0x696969,
-            11: 0x696969,
-            12: 0xA9A9A9,       // 可切换平台
-            13: 0x646478,       // 特殊平台
-            18: 0x8C8CA0,
-            21: 0xFF0000,       // 尖刺 - 红色
-            22: 0xFF3232,
-            23: 0xFFA500,       // 可站立平台 - 橙色
-            28: 0x00FF00,       // 地面顶部 - 绿色
-            29: 0x00C800,
-            30: 0x00B400,
-            31: 0x00A000,
-            32: 0x008C00,
-            35: 0xC80000,       // 陷阱
-            39: 0xDC0000,
-            41: 0xFFC800,       // 特殊平台
-            48: 0xB40000,       // 尖刺陷阱
-            50: 0xC83200,
-            54: 0x808080,       // 墙壁
-            62: 0x40E0D0,       // 水/液体
-            63: 0x40C8C8,
-            64: 0x40B4B4,
-            68: 0xFFD700,       // 可收集物品
-            69: 0xFFDF00,
-            70: 0xFFE700,
-            82: 0x646464,       // 障碍物
-            89: 0x964B00,       // 可破坏物体
-            95: 0xDCDCDC,       // 装饰物
-            102: 0xAA5500,      // 可破坏箱子
-            131: 0xBE0000,      // 特殊陷阱
-            132: 0xB45A00,
-        };
+        // Tile值就是sprite图片索引
+        // 不同范围的值表示翻转变体:
+        // 假设sprite数量为N，则:
+        //   0 ~ N-1: 原始sprite
+        //   N ~ 2N-1: 水平翻转
+        //   2N ~ 3N-1: 垂直翻转
+        // 
+        // 碰撞判断在c.java中是另外的函数处理的
+        // 这里我们只根据tile值分配可视化颜色
+        
+        // 根据tile值获取颜色 - 简单的分组着色
+        function getTileColor(tile) {
+            if (tile === 0) return null; // 空气，透明
+            
+            // 最常见的地形块 42 - 主地形棕色
+            if (tile === 42) return 0x8B4513;
+            
+            // 1-6: 基础地形变体 - 棕色系
+            if (tile >= 1 && tile <= 6) return 0xA0522D;
+            
+            // 7-11: 金属/特殊平台 - 灰色
+            if (tile >= 7 && tile <= 11) return 0x696969;
+            
+            // 12, 18: 切换平台 - 紫色
+            if (tile === 12 || tile === 18) return 0x9370DB;
+            
+            // 13-17, 19-22: 平台元素 - 深灰
+            if (tile >= 13 && tile <= 22) return 0x505050;
+            
+            // 23: 平台边缘 - 深棕
+            if (tile === 23) return 0x654321;
+            
+            // 24-27: 装饰 - 浅灰
+            if (tile >= 24 && tile <= 27) return 0xA9A9A9;
+            
+            // 28-32: 实体块 - 深棕
+            if (tile >= 28 && tile <= 32) return 0x5C4033;
+            
+            // 33-40: 地形变体 - 棕色
+            if (tile >= 33 && tile <= 40) return 0x8B5A2B;
+            
+            // 41: 平台 - 深棕边缘
+            if (tile === 41) return 0x6B4423;
+            
+            // 43-50: 特殊地形 - 深棕
+            if (tile >= 43 && tile <= 50) return 0x7B5427;
+            
+            // 35, 39, 48, 50, 131: 尖刺陷阱 - 红色
+            if (tile === 35 || tile === 39 || tile === 48 || tile === 131) return 0xFF0000;
+            
+            // 51-70: 地形/装饰 - 浅棕
+            if (tile >= 51 && tile <= 70) return 0x9B7B5B;
+            
+            // 71-90: 地形 - 中棕
+            if (tile >= 71 && tile <= 90) return 0x8B6B4B;
+            
+            // 89, 102, 132: 可破坏 - 橙棕
+            if (tile === 89 || tile === 102 || tile === 132) return 0xCD853F;
+            
+            // 91-110: 地形 - 棕色
+            if (tile >= 91 && tile <= 110) return 0x7B5B3B;
+            
+            // 95: 装饰 - 浅灰
+            if (tile === 95) return 0xC0C0C0;
+            
+            // 111-150: 较高索引地形 - 浅棕
+            if (tile >= 111 && tile <= 150) return 0xAB8B6B;
+            
+            // 150+: 高索引sprite(可能是翻转版) - 中棕
+            if (tile > 150) return 0x9B7B5B;
+            
+            // 默认灰色
+            return 0x808080;
+        }
 
         class MapScene extends Phaser.Scene {
             constructor() {
@@ -263,6 +297,12 @@
                 
                 for (let i = 0; i < 5; i++) {
                     this.load.json(`stage${i}`, `../map_data/stage${i}.json`);
+                }
+                
+                // 预加载plano1 sprites (地形)
+                // plano1有55个sprite，tile值0-54是原始，55-108是水平翻转，109-162是垂直翻转
+                for (let i = 0; i < 55; i++) {
+                    this.load.image(`tile_${i}`, `sprites/plano1/sprite_${i.toString().padStart(3, '0')}.png`);
                 }
             }
 
@@ -343,23 +383,54 @@
                 const chunkHeight = terrain.length;
                 const chunkWidth = terrain[0].length;
                 
+                // plano1有55个sprite，tile值映射:
+                // 0-54: 原始sprite
+                // 55-108: 水平翻转 (sprite = tile - 55)
+                // 109-162: 垂直翻转 (sprite = tile - 109)
+                const NUM_SPRITES = 55;
+                
                 // 渲染地形
                 for (let y = 0; y < chunkHeight; y++) {
                     for (let x = 0; x < chunkWidth; x++) {
                         const tileValue = terrain[y][x];
                         if (tileValue === 0) continue; // 跳过空气
                         
-                        const color = TILE_COLORS[tileValue] || 0x505050;
                         const px = offsetX + x * this.tileSize;
                         const py = offsetY + y * this.tileSize;
                         
-                        const tile = this.add.rectangle(
-                            px, py,
-                            this.tileSize, this.tileSize,
-                            color
-                        );
-                        tile.setOrigin(0, 0);
-                        tile.setStrokeStyle(0.5, 0x000000, 0.3);
+                        // 计算sprite索引和翻转
+                        let spriteIndex = tileValue;
+                        let flipX = false;
+                        let flipY = false;
+                        
+                        if (tileValue >= NUM_SPRITES * 2) {
+                            // 垂直翻转
+                            spriteIndex = tileValue - NUM_SPRITES * 2;
+                            flipY = true;
+                        } else if (tileValue >= NUM_SPRITES) {
+                            // 水平翻转
+                            spriteIndex = tileValue - NUM_SPRITES;
+                            flipX = true;
+                        }
+                        
+                        // 尝试使用sprite图片
+                        const textureKey = `tile_${spriteIndex}`;
+                        if (this.textures.exists(textureKey)) {
+                            const sprite = this.add.image(px, py, textureKey);
+                            sprite.setOrigin(0, 0);
+                            sprite.setFlipX(flipX);
+                            sprite.setFlipY(flipY);
+                            // 缩放到tileSize (sprite原始大小可能不是8x8)
+                            sprite.setDisplaySize(this.tileSize, this.tileSize);
+                        } else {
+                            // 回退到颜色方块
+                            const color = getTileColor(tileValue);
+                            if (color !== null) {
+                                const tile = this.add.rectangle(px, py, this.tileSize, this.tileSize, color);
+                                tile.setOrigin(0, 0);
+                                tile.setStrokeStyle(0.5, 0x000000, 0.3);
+                            }
+                        }
                     }
                 }
                 
